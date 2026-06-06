@@ -1,0 +1,91 @@
+{
+  "version": 5,
+  "configurePresets": [
+    {
+      "name": "base",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "dev",
+      "inherits": [
+        "base"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-DQT_FORCE_ASSERTS"
+      }
+    },
+    {
+      "name": "asan",
+      "inherits": [
+        "dev"
+      ],
+      "cacheVariables": {
+        "ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "ubsan",
+      "inherits": [
+        "dev"
+      ],
+      "cacheVariables": {
+        "ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "tsan",
+      "inherits": [
+        "dev"
+      ],
+      "cacheVariables": {
+        "ENABLE_TSAN": "ON"
+      }
+    },
+    {
+      "name": "clazy",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "OFF"
+      },
+      "environment": {
+        "CXX": "clazy",
+        "CCACHE_DISABLE": "ON"
+      }
+    },
+    {
+      "name": "clang-tidy",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CMAKE_CXX_CLANG_TIDY": "clang-tidy"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "clazy",
+      "configurePreset": "clazy",
+      "environment": {
+        "CLAZY_CHECKS": "level2,no-qstring-allocations,no-fully-qualified-moc-types",
+        "CCACHE_DISABLE": "ON",
+        "CLAZY_IGNORE_DIRS": ".*libkode.*"
+      }
+    },
+    {
+      "name": "clang-tidy",
+      "configurePreset": "clang-tidy"
+    }
+  ]
+}
