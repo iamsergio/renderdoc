@@ -214,6 +214,7 @@ option(ENABLE_XCB "Enable xcb windowing support" ON)
 option(ENABLE_UNSUPPORTED_EXPERIMENTAL_POSSIBLY_BROKEN_WAYLAND "Enable EXPERIMENTAL, POSSIBLY BROKEN, UNSUPPORTED wayland windowing support" OFF)
 
 option(ENABLE_ASAN "Enable address sanitizer" OFF)
+option(ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(ENABLE_TSAN "Enable thread sanitizer" OFF)
 option(ENABLE_MSAN "Enable memory sanitizer" OFF)
 
@@ -226,6 +227,11 @@ endif()
 if(ENABLE_ASAN)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
     message(STATUS "Enabling address sanitizer - may cause issues if capturing, only recommended for use with replay only")
+endif()
+
+if(ENABLE_UBSAN)
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-omit-frame-pointer")
+    message(STATUS "Enabling undefined behavior sanitizer - may cause issues if capturing, only recommended for use with replay only")
 endif()
 
 if(ENABLE_TSAN)

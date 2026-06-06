@@ -45,6 +45,11 @@ if(ENABLE_ASAN)
     set (QMAKE_LDFLAGS "-fsanitize=address")
 endif()
 
+if(ENABLE_UBSAN)
+    set (QMAKE_CXXFLAGS "-fsanitize=undefined -fno-omit-frame-pointer")
+    set (QMAKE_LDFLAGS "-fsanitize=undefined")
+endif()
+
 if(ENABLE_TSAN)
     set (QMAKE_CXXFLAGS "-fsanitize=thread -fno-omit-frame-pointer")
     set (QMAKE_LDFLAGS "-fsanitize=thread")
