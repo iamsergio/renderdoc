@@ -109,6 +109,11 @@ set(VULKAN_JSON_SUFFIX "" CACHE STRING "Suffix for the vulkan implicit_layer jso
 
 option(INTERNAL_SELF_CAPTURE "Internal option: enable self-capture" OFF)
 
+set(USE_LINKER "" CACHE STRING "Specify the linker to use (lld, mold, ...)")
+if(USE_LINKER)
+    add_link_options(-fuse-ld=${USE_LINKER})
+endif()
+
 set(RDOC_BASE_NAME "renderdoc")
 if(INTERNAL_SELF_CAPTURE)
     set(RDOC_BASE_NAME "rdocself")
