@@ -1,0 +1,10 @@
+# Usage:
+# 1. Install pre-commit: https://pre-commit.com/#install
+# 2. Install the git hook scripts: pre-commit install -f
+
+repos:
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v15.0.7
+    hooks:
+      - id: clang-format
+        exclude: (.json)
