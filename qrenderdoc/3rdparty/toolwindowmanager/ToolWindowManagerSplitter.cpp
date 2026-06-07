@@ -38,7 +38,7 @@ void ToolWindowManagerSplitter::childEvent(QChildEvent *event)
 {
   QList<int> s = sizes();
 
-  QWidget *w = qobject_cast<QWidget *>(event->child());
+  QWidget *w = dynamic_cast<QWidget *>(event->child());
   int idx = -1;
   if(w)
     idx = indexOf(w);
