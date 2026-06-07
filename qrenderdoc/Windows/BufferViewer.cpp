@@ -2395,8 +2395,8 @@ BufferViewer::BufferViewer(ICaptureContext &ctx, bool meshview, QWidget *parent)
 
   ui->render->SetContext(m_Ctx);
 
-  byteRangeStart = (RDSpinBox64 *)ui->byteRangeStart;
-  byteRangeLength = (RDSpinBox64 *)ui->byteRangeLength;
+  byteRangeStart = ui->byteRangeStart;
+  byteRangeLength = ui->byteRangeLength;
 
   byteRangeStart->configure();
   byteRangeLength->configure();

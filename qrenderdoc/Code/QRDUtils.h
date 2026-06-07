@@ -895,6 +895,12 @@ private:
   static const qlonglong mask = (1ULL << 53U) - 1;
 
 public:
+  using QDoubleSpinBox::QDoubleSpinBox;
+  using QDoubleSpinBox::setMaximum;
+  using QDoubleSpinBox::setMinimum;
+  using QDoubleSpinBox::setRange;
+  using QDoubleSpinBox::setSingleStep;
+
   void configure() { QDoubleSpinBox::setDecimals(0); }
   void setSingleStep(qlonglong val) { QDoubleSpinBox::setSingleStep(makeValue(val)); }
   void setMinimum(qlonglong min) { QDoubleSpinBox::setMinimum(makeValue(min)); }

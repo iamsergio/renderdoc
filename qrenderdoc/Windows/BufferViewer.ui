@@ -1056,7 +1056,7 @@
      </widget>
     </item>
     <item>
-     <widget class="QDoubleSpinBox" name="byteRangeStart">
+     <widget class="RDSpinBox64" name="byteRangeStart">
       <property name="maximum">
        <double>999123456.000000000000000</double>
       </property>
@@ -1070,7 +1070,7 @@
      </widget>
     </item>
     <item>
-     <widget class="QDoubleSpinBox" name="byteRangeLength">
+     <widget class="RDSpinBox64" name="byteRangeLength">
       <property name="maximum">
        <double>999123456.000000000000000</double>
       </property>
@@ -1153,6 +1153,11 @@
    <extends>QWidget</extends>
    <header>Widgets/BufferFormatSpecifier.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>RDSpinBox64</class>
+   <extends>QDoubleSpinBox</extends>
+   <header>Code/QRDUtils.h</header>
   </customwidget>
  </customwidgets>
  <resources>
