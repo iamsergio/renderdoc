@@ -16,20 +16,30 @@ set(RENDERDOC_PCRE_PACKAGE https://sourceforge.net/projects/pcre/files/pcre/8.45
 # Only check qt version if we're building qrenderdoc
 if(ENABLE_QRENDERDOC)
 
-execute_process(
-    COMMAND ${QMAKE_QT5_COMMAND} -query QT_VERSION
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE QT_VERSION
-    ERROR_VARIABLE QT_VERSION_STDERR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_STRIP_TRAILING_WHITESPACE
-    )
+if(USE_QMAKE)
+    execute_process(
+        COMMAND ${QMAKE_QT5_COMMAND} -query QT_VERSION
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE QT_VERSION
+        ERROR_VARIABLE QT_VERSION_STDERR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_STRIP_TRAILING_WHITESPACE
+        )
 
-# we need the trailing .999 since 5.5.1 would be VERSION_GREATER than 5.5 which implicitly means 5.5.0
-if (QT_VERSION VERSION_GREATER 5.5.999)
-    message(STATUS "Building using Qt ${QT_VERSION}")
+    # we need the trailing .999 since 5.5.1 would be VERSION_GREATER than 5.5 which implicitly means 5.5.0
+    if (QT_VERSION VERSION_GREATER 5.5.999)
+        message(STATUS "Building using Qt ${QT_VERSION} (qmake)")
+    else()
+        message(FATAL_ERROR "${QMAKE_QT5_COMMAND} -query QT_VERSION returned: \"${QT_VERSION}\". Error output was: \"${QT_VERSION_STDERR}\". We require Qt >= 5.6 and for the qmake executable to run Qt5. Check your distribution for how to configure Qt5, you may need to set the QT_SELECT environment variable or customise the cmake variable QMAKE_QT5_COMMAND to qmake-qt5")
+    endif()
 else()
-    message(FATAL_ERROR "${QMAKE_QT5_COMMAND} -query QT_VERSION returned: \"${QT_VERSION}\". Error output was: \"${QT_VERSION_STDERR}\". We require Qt >= 5.6 and for the qmake executable to run Qt5. Check your distribution for how to configure Qt5, you may need to set the QT_SELECT environment variable or customise the cmake variable QMAKE_QT5_COMMAND to qmake-qt5")
+    # Native CMake build path
+    find_package(Qt5 5.6 REQUIRED COMPONENTS Core Gui Widgets Svg Network)
+    if(NOT APPLE)
+        find_package(Qt5 5.6 REQUIRED COMPONENTS X11Extras)
+    endif()
+    set(QT_VERSION "${Qt5_VERSION}")
+    message(STATUS "Building using Qt ${Qt5_VERSION} (native CMake)")
 endif()
 
 endif() # if(ENABLE_QRENDERDOC)
@@ -208,106 +218,110 @@ if(STATIC_QRENDERDOC)
     set(PYTHON_LINK "-rdynamic -Wl,--whole-archive ${PYTHON_LINK} -Wl,--no-whole-archive")
 endif()
 
-# Output our configuration for qmake. We output this to a separate file so that
-# the user can then open the qrenderdoc.pro in qt creator and be able to build
-# with these configuration entries propagated for e.g. linking against libraries
-# and finding dependencies from the cmake build
-file(WRITE
-     ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-     "CONFIG+=${QMAKE_CONFIG}\n"
-     "\n"
-     "QMAKE_CC=${CMAKE_C_COMPILER}\n"
-     "QMAKE_CXX=${CMAKE_CXX_COMPILER}\n"
-     "QMAKE_LINK=${CMAKE_CXX_COMPILER}\n"
-     "QMAKE_CXXFLAGS+=${warning_flags}\n"
-     "QMAKE_CXXFLAGS+=${QMAKE_CXXFLAGS}\n"
-     "QMAKE_LFLAGS+=${QMAKE_LDFLAGS}\n"
-     "QMAKE_RPATHDIR+=${QMAKE_RPATHDIR}\n"
-     "\n"
-     "LIB_SUFFIX=${LIB_SUFFIX}\n"
-     "LIB_SUBFOLDER_TRAIL_SLASH=${LIB_SUBFOLDER_TRAIL_SLASH}\n"
-     "\n"
-     # search for -lrenderdoc here
-     "LIBS+=-L${CMAKE_LIBRARY_OUTPUT_DIRECTORY}\n"
-     "\n"
-     # include and link against python
-     "INCLUDEPATH+=${PYTHON_INCLUDE_DIR}\n"
-     "LIBS+=${PYTHON_LINK}\n"
-     "\n"
-     "RENDERDOC_VERSION=${RENDERDOC_VERSION}\n"
-     "\n")
+if(USE_QMAKE)
+    # Output our configuration for qmake. We output this to a separate file so that
+    # the user can then open the qrenderdoc.pro in qt creator and be able to build
+    # with these configuration entries propagated for e.g. linking against libraries
+    # and finding dependencies from the cmake build
+    file(WRITE
+         ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+         "CONFIG+=${QMAKE_CONFIG}\n"
+         "\n"
+         "QMAKE_CC=${CMAKE_C_COMPILER}\n"
+         "QMAKE_CXX=${CMAKE_CXX_COMPILER}\n"
+         "QMAKE_LINK=${CMAKE_CXX_COMPILER}\n"
+         "QMAKE_CXXFLAGS+=${warning_flags}\n"
+         "QMAKE_CXXFLAGS+=${QMAKE_CXXFLAGS}\n"
+         "QMAKE_LFLAGS+=${QMAKE_LDFLAGS}\n"
+         "QMAKE_RPATHDIR+=${QMAKE_RPATHDIR}\n"
+         "\n"
+         "LIB_SUFFIX=${LIB_SUFFIX}\n"
+         "LIB_SUBFOLDER_TRAIL_SLASH=${LIB_SUBFOLDER_TRAIL_SLASH}\n"
+         "\n"
+         # search for -lrenderdoc here
+         "LIBS+=-L${CMAKE_LIBRARY_OUTPUT_DIRECTORY}\n"
+         "\n"
+         # include and link against python
+         "INCLUDEPATH+=${PYTHON_INCLUDE_DIR}\n"
+         "LIBS+=${PYTHON_LINK}\n"
+         "\n"
+         "RENDERDOC_VERSION=${RENDERDOC_VERSION}\n"
+         "\n")
 
-if(APPLE)
-    file(APPEND
-        ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-        "OSX_ICONFILE=${CMAKE_CURRENT_BINARY_DIR}/RenderDoc.icns\n"
-        "QMAKE_MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}\n")
-endif()
-
-# Ignore warnings - qmake has no way to do this per-file, so we must do it globally
-if(CMAKE_COMPILER_IS_GNUCXX)
-    file(APPEND
-        ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-        "QMAKE_CXXFLAGS+=-Wno-unknown-warning -Wno-cast-function-type -Wno-stringop-truncation\n")
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 14.0)
+    if(APPLE)
         file(APPEND
             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-            "QMAKE_CXXFLAGS += -Wno-template-id-cdtor\n")
+            "OSX_ICONFILE=${CMAKE_CURRENT_BINARY_DIR}/RenderDoc.icns\n"
+            "QMAKE_MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}\n")
     endif()
-endif()
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    file(APPEND
-        ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-        "QMAKE_CXXFLAGS+=-Wno-shadow -Wno-shorten-64-to-32\n")
-
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 3.9)
+    # Ignore warnings - qmake has no way to do this per-file, so we must do it globally
+    if(CMAKE_COMPILER_IS_GNUCXX)
         file(APPEND
             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-            "QMAKE_CXXFLAGS+=-Wno-comma\n")
+            "QMAKE_CXXFLAGS+=-Wno-unknown-warning -Wno-cast-function-type -Wno-stringop-truncation\n")
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 14.0)
+            file(APPEND
+                ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+                "QMAKE_CXXFLAGS += -Wno-template-id-cdtor\n")
+        endif()
     endif()
 
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 19)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         file(APPEND
             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-            "QMAKE_CXXFLAGS+=-Wno-cast-function-type\n")
+            "QMAKE_CXXFLAGS+=-Wno-shadow -Wno-shorten-64-to-32\n")
+
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 3.9)
+            file(APPEND
+                ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+                "QMAKE_CXXFLAGS+=-Wno-comma\n")
+        endif()
+
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 19)
+            file(APPEND
+                ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+                "QMAKE_CXXFLAGS+=-Wno-cast-function-type\n")
+        endif()
     endif()
-endif()
 
 
-if(ENABLE_UNSUPPORTED_EXPERIMENTAL_POSSIBLY_BROKEN_WAYLAND)
-    message(WARNING "!!!! Using the Wayland Qt platform in qrenderdoc is NOT SUPPORTED !!!!")
-    file(APPEND
-        ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-        "DEFINES+=RENDERDOC_WINDOWING_WAYLAND\n")
-endif()
+    if(ENABLE_UNSUPPORTED_EXPERIMENTAL_POSSIBLY_BROKEN_WAYLAND)
+        message(WARNING "!!!! Using the Wayland Qt platform in qrenderdoc is NOT SUPPORTED !!!!")
+        file(APPEND
+            ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+            "DEFINES+=RENDERDOC_WINDOWING_WAYLAND\n")
+    endif()
 
-# propagate build version info. Lots of escaping needed here to pass ""s into the define value
-if(BUILD_VERSION_STABLE)
-    file(APPEND
-         ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-         "DEFINES+=RENDERDOC_STABLE_BUILD=1\n")
-endif()
+    # propagate build version info. Lots of escaping needed here to pass ""s into the define value
+    if(BUILD_VERSION_STABLE)
+        file(APPEND
+             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+             "DEFINES+=RENDERDOC_STABLE_BUILD=1\n")
+    endif()
 
-if(NOT BUILD_VERSION_DIST_NAME STREQUAL "")
-    file(APPEND
-         ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-         "DEFINES+=DISTRIBUTION_NAME='\\\\\"${BUILD_VERSION_DIST_NAME}\\\\\"'\n")
-endif()
+    if(NOT BUILD_VERSION_DIST_NAME STREQUAL "")
+        file(APPEND
+             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+             "DEFINES+=DISTRIBUTION_NAME='\\\\\"${BUILD_VERSION_DIST_NAME}\\\\\"'\n")
+    endif()
 
-if(NOT BUILD_VERSION_DIST_VER STREQUAL "")
-    file(APPEND
-         ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-         "DEFINES+=DISTRIBUTION_VERSION='\\\\\"${BUILD_VERSION_DIST_VER}\\\\\"'\n")
-endif()
+    if(NOT BUILD_VERSION_DIST_VER STREQUAL "")
+        file(APPEND
+             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+             "DEFINES+=DISTRIBUTION_VERSION='\\\\\"${BUILD_VERSION_DIST_VER}\\\\\"'\n")
+    endif()
 
-if(NOT BUILD_VERSION_DIST_CONTACT STREQUAL "")
-    file(APPEND
-         ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-         "DEFINES+=DISTRIBUTION_CONTACT='\\\\\"${BUILD_VERSION_DIST_CONTACT}\\\\\"'\n")
-endif()
+    if(NOT BUILD_VERSION_DIST_CONTACT STREQUAL "")
+        file(APPEND
+             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+             "DEFINES+=DISTRIBUTION_CONTACT='\\\\\"${BUILD_VERSION_DIST_CONTACT}\\\\\"'\n")
+    endif()
+endif() # USE_QMAKE
 
 option(QRENDERDOC_ENABLE_PYSIDE2 "Enable PySide2 if found" ON)
+
+set(QRENDERDOC_PYSIDE2_AVAILABLE OFF)
 
 if(NOT QRENDERDOC_ENABLE_PYSIDE2)
     message(STATUS "PySide2 integration disabled")
@@ -318,34 +332,40 @@ elseif(PySide2_FOUND AND Shiboken2_FOUND AND TARGET Shiboken2::libshiboken AND T
         message(FATAL_ERROR "Shiboken2 that we found was linked against python ${SHIBOKEN_PYTHON_VERSION_MAJOR}.${SHIBOKEN_PYTHON_VERSION_MINOR} but the python library we're linking against is ${PYTHONLIBS_VERSION_STRING}. Ensure these versions are identical or disable PySide2 compilation with QRENDERDOC_ENABLE_PYSIDE2.")
     endif()
 
+    set(QRENDERDOC_PYSIDE2_AVAILABLE ON)
+
     get_target_property(SHIBOKEN2_INCLUDE_DIRS Shiboken2::libshiboken INTERFACE_INCLUDE_DIRECTORIES)
     get_target_property(PYSIDE2_INCLUDE_DIRS PySide2::pyside2 INTERFACE_INCLUDE_DIRECTORIES)
 
-    # append each include dir
-    foreach(DIR ${SHIBOKEN2_INCLUDE_DIRS})
+    if(USE_QMAKE)
+        # append each include dir
+        foreach(DIR ${SHIBOKEN2_INCLUDE_DIRS})
+            file(APPEND
+                 ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+                 "INCLUDEPATH+=${DIR}\n")
+        endforeach()
+
+        foreach(DIR ${PYSIDE2_INCLUDE_DIRS})
+            file(APPEND
+                 ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+                 "INCLUDEPATH+=${DIR}\n")
+        endforeach()
+
+        # Add configuration for PySide2
         file(APPEND
              ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-             "INCLUDEPATH+=${DIR}\n")
-    endforeach()
-
-    foreach(DIR ${PYSIDE2_INCLUDE_DIRS})
-        file(APPEND
-             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-             "INCLUDEPATH+=${DIR}\n")
-    endforeach()
-
-    # Add configuration for PySide2
-    file(APPEND
-         ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-         "DEFINES+=PYSIDE2_ENABLED=1\n"
-         "DEFINES+=PYSIDE2_SYS_PATH=${PYSIDE_PYTHONPATH}\n"
-         "LIBS+=-lshiboken2${SHIBOKEN_PYTHON_SHARED_LIBRARY_SUFFIX}\n")
+             "DEFINES+=PYSIDE2_ENABLED=1\n"
+             "DEFINES+=PYSIDE2_SYS_PATH=${PYSIDE_PYTHONPATH}\n"
+             "LIBS+=-lshiboken2${SHIBOKEN_PYTHON_SHARED_LIBRARY_SUFFIX}\n")
+    endif()
 else()
     message(STATUS "PySide2 not found - Qt will not be accessible in python scripting. See https://github.com/baldurk/renderdoc/wiki/PySide2")
 
-    file(APPEND
-         ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
-         "DEFINES+=PYSIDE2_ENABLED=0\n")
+    if(USE_QMAKE)
+        file(APPEND
+             ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_cmake.pri
+             "DEFINES+=PYSIDE2_ENABLED=0\n")
+    endif()
 endif()
 
 # generate the SWIG interface files
@@ -413,28 +433,411 @@ if(APPLE AND CMAKE_GENERATOR STREQUAL "Xcode")
     list(APPEND QRD_DEPENDENCIES ${QRD_XCODE_SOURCES})
 endif()
 
-# The case here is deliberately not matching the executable name
-# This means the custom command doesn't create this output file,
-# which causes CMake to rerun this target every time so that Qt
-# can do dependency checking and rebuild anything necessary.
-# Xcode does not match this behaviour. Add broad brush file dependencies.
-# Xcode has an option to match this behaviour (not exposed by cmake).
-add_custom_command(OUTPUT QRenderDoc
-    COMMAND ${SET_SYSTEM_PATH_COMMAND} ${QMAKE_QT5_COMMAND} "CMAKE_DIR=${CMAKE_BINARY_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND ${GENERATOR_MAKE} ${GENERATOR_MAKE_PARAMS}
-    DEPENDS ${QRD_DEPENDENCIES})
-add_custom_target(build-qrenderdoc ALL DEPENDS QRenderDoc DEPENDS renderdoc DEPENDS swig-bindings)
+if(USE_QMAKE)
+    # The case here is deliberately not matching the executable name
+    # This means the custom command doesn't create this output file,
+    # which causes CMake to rerun this target every time so that Qt
+    # can do dependency checking and rebuild anything necessary.
+    # Xcode does not match this behaviour. Add broad brush file dependencies.
+    # Xcode has an option to match this behaviour (not exposed by cmake).
+    add_custom_command(OUTPUT QRenderDoc
+        COMMAND ${SET_SYSTEM_PATH_COMMAND} ${QMAKE_QT5_COMMAND} "CMAKE_DIR=${CMAKE_BINARY_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMAND ${GENERATOR_MAKE} ${GENERATOR_MAKE_PARAMS}
+        DEPENDS ${QRD_DEPENDENCIES})
+    add_custom_target(build-qrenderdoc ALL DEPENDS QRenderDoc DEPENDS renderdoc DEPENDS swig-bindings)
 
-if(APPLE AND CMAKE_GENERATOR STREQUAL "Xcode")
-    set_target_properties(build-qrenderdoc PROPERTIES XCODE_SCHEME_DEBUG_DOCUMENT_VERSIONING OFF)
-    set_target_properties(build-qrenderdoc PROPERTIES XCODE_SCHEME_EXECUTABLE ${CMAKE_BINARY_DIR}/bin/qrenderdoc.app)
-    target_sources(build-qrenderdoc PRIVATE ${QRD_XCODE_SOURCES})
-    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${CODE_FILES})
-    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${STYLES_FILES})
-    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${WIDGETS_FILES})
-    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${WINDOWS_FILES})
-    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${THIRDPARTY_FILES})
-endif()
+    if(APPLE AND CMAKE_GENERATOR STREQUAL "Xcode")
+        set_target_properties(build-qrenderdoc PROPERTIES XCODE_SCHEME_DEBUG_DOCUMENT_VERSIONING OFF)
+        set_target_properties(build-qrenderdoc PROPERTIES XCODE_SCHEME_EXECUTABLE ${CMAKE_BINARY_DIR}/bin/qrenderdoc.app)
+        target_sources(build-qrenderdoc PRIVATE ${QRD_XCODE_SOURCES})
+        source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${CODE_FILES})
+        source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${STYLES_FILES})
+        source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${WIDGETS_FILES})
+        source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${WINDOWS_FILES})
+        source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${THIRDPARTY_FILES})
+    endif()
+else()
+    # ============================================================
+    # Native CMake target for qrenderdoc - mirrors qrenderdoc.pro
+    # ============================================================
+
+    set(QRD_SOURCES
+        Code/qrenderdoc.cpp
+        Code/qprocessinfo.cpp
+        Code/ReplayManager.cpp
+        Code/CaptureContext.cpp
+        Code/ScintillaSyntax.cpp
+        Code/QRDUtils.cpp
+        Code/MiniQtHelper.cpp
+        Code/BufferFormatter.cpp
+        Code/Resources.cpp
+        Code/RGPInterop.cpp
+        Code/pyrenderdoc/PythonContext.cpp
+        Code/Interface/QRDInterface.cpp
+        Code/Interface/Analytics.cpp
+        Code/Interface/ShaderProcessingTool.cpp
+        Code/Interface/PersistantConfig.cpp
+        Code/Interface/RemoteHost.cpp
+        Styles/StyleData.cpp
+        Styles/RDStyle/RDStyle.cpp
+        Styles/RDTweakedNativeStyle/RDTweakedNativeStyle.cpp
+        Windows/Dialogs/AboutDialog.cpp
+        Windows/Dialogs/CrashDialog.cpp
+        Windows/Dialogs/UpdateDialog.cpp
+        Windows/MainWindow.cpp
+        Windows/EventBrowser.cpp
+        Windows/TextureViewer.cpp
+        Windows/ShaderViewer.cpp
+        Windows/ShaderMessageViewer.cpp
+        Windows/DescriptorViewer.cpp
+        Widgets/Extended/RDLineEdit.cpp
+        Widgets/Extended/RDTextEdit.cpp
+        Widgets/Extended/RDLabel.cpp
+        Widgets/Extended/RDMenu.cpp
+        Widgets/Extended/RDHeaderView.cpp
+        Widgets/Extended/RDToolButton.cpp
+        Widgets/Extended/RDDoubleSpinBox.cpp
+        Widgets/Extended/RDListView.cpp
+        Widgets/ComputeDebugSelector.cpp
+        Widgets/CustomPaintWidget.cpp
+        Widgets/ResourcePreview.cpp
+        Widgets/ThumbnailStrip.cpp
+        Widgets/ReplayOptionsSelector.cpp
+        Widgets/TextureGoto.cpp
+        Widgets/RangeHistogram.cpp
+        Widgets/AnnotationDisplay.cpp
+        Widgets/CollapseGroupBox.cpp
+        Windows/Dialogs/TextureSaveDialog.cpp
+        Windows/Dialogs/CaptureDialog.cpp
+        Windows/Dialogs/LiveCapture.cpp
+        Widgets/Extended/RDListWidget.cpp
+        Windows/APIInspector.cpp
+        Windows/PipelineState/PipelineStateViewer.cpp
+        Windows/PipelineState/VulkanPipelineStateViewer.cpp
+        Windows/PipelineState/D3D11PipelineStateViewer.cpp
+        Windows/PipelineState/D3D12PipelineStateViewer.cpp
+        Windows/PipelineState/GLPipelineStateViewer.cpp
+        Widgets/Extended/RDTreeView.cpp
+        Widgets/Extended/RDTreeWidget.cpp
+        Widgets/BufferFormatSpecifier.cpp
+        Windows/BufferViewer.cpp
+        Widgets/Extended/RDTableView.cpp
+        Windows/DebugMessageView.cpp
+        Windows/LogView.cpp
+        Windows/CommentView.cpp
+        Windows/StatisticsViewer.cpp
+        Windows/TimelineBar.cpp
+        Windows/Dialogs/SettingsDialog.cpp
+        Widgets/OrderedListEditor.cpp
+        Widgets/MarkerBreadcrumbs.cpp
+        Widgets/Extended/RDTableWidget.cpp
+        Windows/Dialogs/SuggestRemoteDialog.cpp
+        Windows/Dialogs/VirtualFileDialog.cpp
+        Windows/Dialogs/RemoteManager.cpp
+        Windows/Dialogs/ExtensionManager.cpp
+        Windows/PixelHistoryView.cpp
+        Widgets/PipelineFlowChart.cpp
+        Windows/Dialogs/EnvironmentEditor.cpp
+        Widgets/FindReplace.cpp
+        Widgets/Extended/RDSplitter.cpp
+        Windows/Dialogs/TipsDialog.cpp
+        Windows/Dialogs/ConfigEditor.cpp
+        Windows/PythonShell.cpp
+        Windows/Dialogs/PerformanceCounterSelection.cpp
+        Windows/PerformanceCounterViewer.cpp
+        Windows/ResourceInspector.cpp
+        Windows/Dialogs/AnalyticsConfirmDialog.cpp
+        Windows/Dialogs/AnalyticsPromptDialog.cpp
+        Windows/Dialogs/AxisMappingDialog.cpp
+        Windows/Dialogs/CameraControlsDialog.cpp
+        Windows/Dialogs/ProjectionGuessDialog.cpp
+        # ToolWindowManager + FlowLayout (bundled)
+        3rdparty/toolwindowmanager/ToolWindowManager.cpp
+        3rdparty/toolwindowmanager/ToolWindowManagerArea.cpp
+        3rdparty/toolwindowmanager/ToolWindowManagerSplitter.cpp
+        3rdparty/toolwindowmanager/ToolWindowManagerTabBar.cpp
+        3rdparty/toolwindowmanager/ToolWindowManagerWrapper.cpp
+        3rdparty/flowlayout/FlowLayout.cpp
+    )
+
+    # Headers so AUTOMOC picks them up reliably
+    file(GLOB_RECURSE QRD_HEADERS
+        Code/*.h
+        Styles/*.h
+        Windows/*.h
+        Widgets/*.h
+    )
+    list(APPEND QRD_HEADERS
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/toolwindowmanager/ToolWindowManager.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/toolwindowmanager/ToolWindowManagerArea.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/toolwindowmanager/ToolWindowManagerSplitter.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/toolwindowmanager/ToolWindowManagerTabBar.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/toolwindowmanager/ToolWindowManagerWrapper.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/flowlayout/FlowLayout.h
+    )
+
+    # Scintilla (bundled). Globbed to match the qmake .pro behavior
+    file(GLOB SCINTILLA_LEXLIB_SOURCES  3rdparty/scintilla/lexlib/*.cxx)
+    file(GLOB SCINTILLA_LEXERS_SOURCES  3rdparty/scintilla/lexers/*.cxx)
+    file(GLOB SCINTILLA_SRC_SOURCES     3rdparty/scintilla/src/*.cxx)
+    file(GLOB SCINTILLA_EDIT_SOURCES    3rdparty/scintilla/qt/ScintillaEdit/*.cpp)
+    file(GLOB SCINTILLA_EDITBASE_SOURCES 3rdparty/scintilla/qt/ScintillaEditBase/*.cpp)
+
+    set(SCINTILLA_NON_QT_SOURCES
+        ${SCINTILLA_LEXLIB_SOURCES}
+        ${SCINTILLA_LEXERS_SOURCES}
+        ${SCINTILLA_SRC_SOURCES}
+    )
+    set(SCINTILLA_QT_SOURCES
+        ${SCINTILLA_EDIT_SOURCES}
+        ${SCINTILLA_EDITBASE_SOURCES}
+    )
+    file(GLOB SCINTILLA_QT_HEADERS
+        3rdparty/scintilla/qt/ScintillaEdit/*.h
+        3rdparty/scintilla/qt/ScintillaEditBase/*.h
+    )
+
+    # Mac-specific
+    if(APPLE)
+        list(APPEND QRD_SOURCES Code/AppleUtils.mm)
+    endif()
+
+    # SWIG-generated python bindings (produced by the swig-bindings target above)
+    set(QRD_GENERATED_SOURCES
+        ${CMAKE_BINARY_DIR}/qrenderdoc/renderdoc_python.cxx
+        ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_python.cxx
+    )
+
+    # UI forms (Qt Designer files) - AUTOUIC processes these
+    set(QRD_UI_FILES
+        Windows/Dialogs/AboutDialog.ui
+        Windows/Dialogs/CrashDialog.ui
+        Windows/Dialogs/UpdateDialog.ui
+        Windows/MainWindow.ui
+        Windows/EventBrowser.ui
+        Windows/TextureViewer.ui
+        Widgets/ResourcePreview.ui
+        Widgets/ThumbnailStrip.ui
+        Widgets/ReplayOptionsSelector.ui
+        Windows/Dialogs/TextureSaveDialog.ui
+        Windows/Dialogs/CaptureDialog.ui
+        Windows/Dialogs/LiveCapture.ui
+        Windows/APIInspector.ui
+        Windows/PipelineState/PipelineStateViewer.ui
+        Windows/PipelineState/VulkanPipelineStateViewer.ui
+        Windows/PipelineState/D3D11PipelineStateViewer.ui
+        Windows/PipelineState/D3D12PipelineStateViewer.ui
+        Windows/PipelineState/GLPipelineStateViewer.ui
+        Widgets/BufferFormatSpecifier.ui
+        Widgets/ComputeDebugSelector.ui
+        Windows/BufferViewer.ui
+        Windows/ShaderViewer.ui
+        Windows/ShaderMessageViewer.ui
+        Windows/DescriptorViewer.ui
+        Windows/DebugMessageView.ui
+        Windows/LogView.ui
+        Windows/CommentView.ui
+        Windows/StatisticsViewer.ui
+        Windows/Dialogs/SettingsDialog.ui
+        Windows/Dialogs/SuggestRemoteDialog.ui
+        Windows/Dialogs/VirtualFileDialog.ui
+        Windows/Dialogs/RemoteManager.ui
+        Windows/Dialogs/ExtensionManager.ui
+        Windows/PixelHistoryView.ui
+        Windows/Dialogs/EnvironmentEditor.ui
+        Widgets/FindReplace.ui
+        Windows/Dialogs/TipsDialog.ui
+        Windows/Dialogs/ConfigEditor.ui
+        Windows/PythonShell.ui
+        Windows/Dialogs/PerformanceCounterSelection.ui
+        Windows/PerformanceCounterViewer.ui
+        Windows/ResourceInspector.ui
+        Windows/Dialogs/AnalyticsConfirmDialog.ui
+        Windows/Dialogs/AnalyticsPromptDialog.ui
+        Windows/Dialogs/AxisMappingDialog.ui
+        Windows/Dialogs/CameraControlsDialog.ui
+        Windows/Dialogs/ProjectionGuessDialog.ui
+    )
+
+    set(QRD_RESOURCE_FILES Resources/resources.qrc)
+    if(APPLE)
+        list(APPEND QRD_RESOURCE_FILES Resources/qtconf.qrc)
+    endif()
+
+    add_executable(qrenderdoc
+        ${QRD_SOURCES}
+        ${QRD_HEADERS}
+        ${SCINTILLA_NON_QT_SOURCES}
+        ${SCINTILLA_QT_SOURCES}
+        ${SCINTILLA_QT_HEADERS}
+        ${QRD_GENERATED_SOURCES}
+        ${QRD_UI_FILES}
+        ${QRD_RESOURCE_FILES}
+    )
+
+    set_target_properties(qrenderdoc PROPERTIES
+        AUTOMOC ON
+        AUTOUIC ON
+        AUTORCC ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+
+    # Scintilla non-Qt sources don't need MOC scanning
+    set_source_files_properties(${SCINTILLA_NON_QT_SOURCES} PROPERTIES
+        SKIP_AUTOMOC ON
+        SKIP_AUTOUIC ON
+    )
+    set_source_files_properties(${QRD_GENERATED_SOURCES} PROPERTIES
+        GENERATED TRUE
+        SKIP_AUTOMOC ON
+        SKIP_AUTOUIC ON
+    )
+
+    # QRDUtils.cpp redeclares a Qt private class for ABI access; not for moc.
+    # qmake ignores it because it's only in SOURCES (qmake mocs HEADERS).
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Code/QRDUtils.cpp PROPERTIES
+        SKIP_AUTOMOC ON
+    )
+
+    add_dependencies(qrenderdoc swig-bindings)
+
+    target_include_directories(qrenderdoc PRIVATE
+        ${CMAKE_SOURCE_DIR}/renderdoc/api/replay
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/scintilla/include/qt
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/scintilla/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/scintilla/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/scintilla/lexlib
+        ${PYTHON_INCLUDE_DIR}
+    )
+
+    if(QRENDERDOC_PYSIDE2_AVAILABLE)
+        target_include_directories(qrenderdoc PRIVATE
+            ${SHIBOKEN2_INCLUDE_DIRS}
+            ${PYSIDE2_INCLUDE_DIRS}
+        )
+    endif()
+
+    target_compile_definitions(qrenderdoc PRIVATE
+        QT_NO_CAST_FROM_ASCII
+        QT_NO_CAST_TO_ASCII
+        QT_NO_DEPRECATED_WARNINGS
+        SCINTILLA_QT=1
+        MAKING_LIBRARY=1
+        SCI_LEXER=1
+        RENDERDOC_VERSION=${RENDERDOC_VERSION}
+    )
+
+    if(APPLE)
+        target_compile_definitions(qrenderdoc PRIVATE
+            RENDERDOC_PLATFORM_POSIX
+            RENDERDOC_PLATFORM_APPLE
+        )
+    else()
+        target_compile_definitions(qrenderdoc PRIVATE
+            RENDERDOC_PLATFORM_POSIX
+            RENDERDOC_PLATFORM_LINUX
+        )
+        if(ENABLE_XLIB)
+            target_compile_definitions(qrenderdoc PRIVATE RENDERDOC_WINDOWING_XLIB)
+        endif()
+        if(ENABLE_XCB)
+            target_compile_definitions(qrenderdoc PRIVATE RENDERDOC_WINDOWING_XCB)
+        endif()
+        if(ENABLE_UNSUPPORTED_EXPERIMENTAL_POSSIBLY_BROKEN_WAYLAND)
+            target_compile_definitions(qrenderdoc PRIVATE RENDERDOC_WINDOWING_WAYLAND)
+        endif()
+    endif()
+
+    if(QRENDERDOC_PYSIDE2_AVAILABLE)
+        target_compile_definitions(qrenderdoc PRIVATE
+            PYSIDE2_ENABLED=1
+            PYSIDE2_SYS_PATH=${PYSIDE_PYTHONPATH}
+        )
+    else()
+        target_compile_definitions(qrenderdoc PRIVATE PYSIDE2_ENABLED=0)
+    endif()
+
+    if(STATIC_QRENDERDOC)
+        target_compile_definitions(qrenderdoc PRIVATE STATIC_QRENDERDOC=1)
+    endif()
+
+    if(QRENDERDOC_NO_CXX11_REGEX)
+        target_compile_definitions(qrenderdoc PRIVATE NO_CXX11_REGEX=1)
+    endif()
+
+    target_compile_options(qrenderdoc PRIVATE -Wno-deprecated-declarations)
+
+    # Mirror the per-compiler warning suppressions that the .pri generation applies
+    if(CMAKE_COMPILER_IS_GNUCXX)
+        target_compile_options(qrenderdoc PRIVATE
+            -Wno-unknown-warning
+            -Wno-cast-function-type
+            -Wno-stringop-truncation)
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 14.0)
+            target_compile_options(qrenderdoc PRIVATE -Wno-template-id-cdtor)
+        endif()
+    endif()
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(qrenderdoc PRIVATE -Wno-shadow -Wno-shorten-64-to-32)
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 3.9)
+            target_compile_options(qrenderdoc PRIVATE -Wno-comma)
+        endif()
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 19)
+            target_compile_options(qrenderdoc PRIVATE -Wno-cast-function-type)
+        endif()
+    endif()
+
+    target_link_libraries(qrenderdoc PRIVATE
+        Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg Qt5::Network
+        renderdoc
+        ${PYTHON_LIBRARY}
+    )
+
+    if(NOT APPLE)
+        target_link_libraries(qrenderdoc PRIVATE Qt5::X11Extras)
+    endif()
+
+    if(STATIC_QRENDERDOC)
+        target_link_libraries(qrenderdoc PRIVATE util)
+        target_link_options(qrenderdoc PRIVATE
+            -rdynamic
+            "LINKER:--whole-archive"
+            ${PYTHON_LIBRARY}
+            "LINKER:--no-whole-archive"
+        )
+    endif()
+
+    if(QRENDERDOC_PYSIDE2_AVAILABLE)
+        target_link_libraries(qrenderdoc PRIVATE
+            shiboken2${SHIBOKEN_PYTHON_SHARED_LIBRARY_SUFFIX}
+        )
+    endif()
+
+    if(APPLE)
+        target_link_libraries(qrenderdoc PRIVATE
+            "-framework Cocoa"
+            "-framework QuartzCore"
+        )
+        set_target_properties(qrenderdoc PROPERTIES
+            INSTALL_RPATH "@executable_path/../lib"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+    else()
+        # Linux: rpath to find librenderdoc.so next to the binary or in ../lib
+        set_target_properties(qrenderdoc PROPERTIES
+            INSTALL_RPATH "\$ORIGIN:\$ORIGIN/../lib${LIB_SUFFIX}/${LIB_SUBFOLDER_TRAIL_SLASH}"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+        target_link_options(qrenderdoc PRIVATE
+            "LINKER:--no-as-needed"
+            -rdynamic
+        )
+    endif()
+
+    add_custom_target(build-qrenderdoc ALL DEPENDS qrenderdoc)
+endif() # USE_QMAKE
 
 install (PROGRAMS ${CMAKE_BINARY_DIR}/bin/qrenderdoc DESTINATION bin)
 
