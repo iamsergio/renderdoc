@@ -1199,20 +1199,20 @@ default has structured data but no buffers available.
 
 :type: bool
 )");
-  bool requiresBuffers;
+  bool requiresBuffers = true;
 
   DOCUMENT(R"(Indicates whether or not files in this format can be opened and processed as
 structured data.
 
 :type: bool
 )");
-  bool openSupported;
+  bool openSupported = true;
 
   DOCUMENT(R"(Indicates whether captures or structured data can be saved out in this format.
 
 :type: bool
 )");
-  bool convertSupported;
+  bool convertSupported = true;
 };
 
 DECLARE_REFLECTION_STRUCT(CaptureFileFormat);
