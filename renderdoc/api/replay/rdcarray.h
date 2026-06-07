@@ -58,9 +58,16 @@ struct ItemHelper
 template <typename T>
 struct ItemHelper<T, true>
 {
-  static void initRange(T *first, size_t itemCount) { memset(first, 0, itemCount * sizeof(T)); }
+  static void initRange(T *first, size_t itemCount)
+  {
+    if(itemCount == 0)
+      return;
+    memset(first, 0, itemCount * sizeof(T));
+  }
   static int compRange(const T *a, const T *b, size_t count)
   {
+    if(count == 0)
+      return 0;
     return memcmp(a, b, count * sizeof(T));
   }
 };
@@ -87,10 +94,14 @@ struct ItemCopyHelper<T, true>
 {
   static void copyRange(T *dest, const T *src, size_t count)
   {
+    if(count == 0)
+      return;
     memcpy(dest, src, count * sizeof(T));
   }
   static void moveRange(T *dest, const T *src, size_t count)
   {
+    if(count == 0)
+      return;
     memcpy(dest, src, count * sizeof(T));
   }
 };
