@@ -4,10 +4,21 @@ else()
   cmake_minimum_required(VERSION 2.8.12)
 endif()
 
-if(APPLE)
+if(APPLE AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../bin")
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+endif()
+
+# When invoked via add_subdirectory() from the top-level RenderDoc build, the
+# parent project's strict warning/-Werror flag set and -std=gnu++14 leak in via
+# CMAKE_CXX_FLAGS / CMAKE_CXX_STANDARD and break third-party sources
+# (nuklear, fmt, VMA). Reset to a clean slate so demos picks its own.
+if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(CMAKE_CXX_FLAGS "")
+    unset(CMAKE_CXX_STANDARD)
+    unset(CMAKE_CXX_STANDARD_REQUIRED)
+    unset(warning_flags)
 endif()
 
 # Configure some stuff that needs to be set really early
@@ -235,7 +246,7 @@ project(demos)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-    list(APPEND warning_flags -Werror -Wno-unused-result -Wno-nullability-completeness)
+    list(APPEND warning_flags -Wno-unused-result -Wno-nullability-completeness)
     string(REPLACE ";" " " warning_flags "${warning_flags}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${warning_flags}")
 endif()
