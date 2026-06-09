@@ -18,7 +18,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_FLAGS": "-DQT_FORCE_ASSERTS",
-        "USE_QMAKE": "OFF",
         "USE_LINKER": "mold"
       }
     },

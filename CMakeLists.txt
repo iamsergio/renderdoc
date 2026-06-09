@@ -213,7 +213,6 @@ option(ENABLE_METAL "Enable Metal driver" OFF)
 option(ENABLE_RENDERDOCCMD "Enable renderdoccmd" ON)
 option(ENABLE_QRENDERDOC "Enable qrenderdoc" ON)
 option(ENABLE_PYRENDERDOC "Enable renderdoc python modules" ON)
-option(USE_QMAKE "Build qrenderdoc via qmake (legacy). When OFF, build qrenderdoc with a native CMake target." ON)
 
 option(ENABLE_XLIB "Enable xlib windowing support" ON)
 option(ENABLE_XCB "Enable xcb windowing support" ON)
