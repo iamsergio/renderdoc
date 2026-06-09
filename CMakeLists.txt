@@ -223,6 +223,8 @@ option(ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(ENABLE_TSAN "Enable thread sanitizer" OFF)
 option(ENABLE_MSAN "Enable memory sanitizer" OFF)
 
+option(ENABLE_TESTS "Build the demos workload binary and register util/test/run_tests.py with CTest" OFF)
+
 if(APPLE)
   if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12.0)
     message(FATAL_ERROR "Xcode 12.2 or newer is required to build for Apple")
@@ -526,6 +528,28 @@ endif()
 
 if(ENABLE_RENDERDOCCMD)
     add_subdirectory(renderdoccmd)
+endif()
+
+if(ENABLE_TESTS)
+    if(NOT ENABLE_PYRENDERDOC)
+        message(FATAL_ERROR "ENABLE_TESTS requires ENABLE_PYRENDERDOC (run_tests.py loads the renderdoc python bindings)")
+    endif()
+
+    enable_testing()
+
+    add_subdirectory(util/test/demos)
+
+    add_test(
+        NAME renderdoc_tests
+        COMMAND ${PYTHON_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/util/test/run_tests.py
+            --renderdoc  ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+            --pyrenderdoc ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+            --demos-binary $<TARGET_FILE:demos>
+            --artifacts ${CMAKE_BINARY_DIR}/test_artifacts
+            --temp      ${CMAKE_BINARY_DIR}/test_tmp
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/util/test
+    )
 endif()
 
 # install documentation files
