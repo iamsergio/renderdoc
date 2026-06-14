@@ -44,6 +44,8 @@ endif()
 include(ExternalProject)
 include(CheckIncludeFile)
 
+if(ENABLE_PYRENDERDOC)
+
 # Need bison for swig
 find_package(BISON)
 
@@ -179,7 +181,18 @@ endforeach()
 
 add_custom_target(swig-bindings ALL DEPENDS ${swig_output})
 
+else() # not ENABLE_PYRENDERDOC
+    set(QRENDERDOC_PYSIDE2_AVAILABLE OFF)
+    add_custom_target(swig-bindings)
+endif()
+
 if(ENABLE_QRENDERDOC)
+
+    if(ENABLE_PYRENDERDOC)
+        set(QRD_PYTHON_SOURCES Code/pyrenderdoc/PythonContext.cpp)
+    else()
+        set(QRD_PYTHON_SOURCES Code/pyrenderdoc/PythonContext_nopython.cpp)
+    endif()
 
     set(QRD_SOURCES
         Code/qrenderdoc.cpp
@@ -192,7 +205,7 @@ if(ENABLE_QRENDERDOC)
         Code/BufferFormatter.cpp
         Code/Resources.cpp
         Code/RGPInterop.cpp
-        Code/pyrenderdoc/PythonContext.cpp
+        ${QRD_PYTHON_SOURCES}
         Code/Interface/QRDInterface.cpp
         Code/Interface/Analytics.cpp
         Code/Interface/ShaderProcessingTool.cpp
@@ -323,10 +336,14 @@ if(ENABLE_QRENDERDOC)
     endif()
 
     # SWIG-generated python bindings (produced by the swig-bindings target above)
-    set(QRD_GENERATED_SOURCES
-        ${CMAKE_BINARY_DIR}/qrenderdoc/renderdoc_python.cxx
-        ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_python.cxx
-    )
+    if(ENABLE_PYRENDERDOC)
+        set(QRD_GENERATED_SOURCES
+            ${CMAKE_BINARY_DIR}/qrenderdoc/renderdoc_python.cxx
+            ${CMAKE_BINARY_DIR}/qrenderdoc/qrenderdoc_python.cxx
+        )
+    else()
+        set(QRD_GENERATED_SOURCES)
+    endif()
 
     # UI forms (Qt Designer files) - AUTOUIC processes these
     set(QRD_UI_FILES
@@ -429,8 +446,10 @@ if(ENABLE_QRENDERDOC)
         ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/scintilla/include
         ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/scintilla/src
         ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/scintilla/lexlib
-        ${PYTHON_INCLUDE_DIR}
     )
+    if(ENABLE_PYRENDERDOC)
+        target_include_directories(qrenderdoc PRIVATE ${PYTHON_INCLUDE_DIR})
+    endif()
 
     if(QRENDERDOC_PYSIDE2_AVAILABLE)
         target_include_directories(qrenderdoc PRIVATE
@@ -512,8 +531,10 @@ if(ENABLE_QRENDERDOC)
     target_link_libraries(qrenderdoc PRIVATE
         Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Svg Qt5::Network
         renderdoc
-        ${PYTHON_LIBRARY}
     )
+    if(ENABLE_PYRENDERDOC)
+        target_link_libraries(qrenderdoc PRIVATE ${PYTHON_LIBRARY})
+    endif()
 
     if(NOT APPLE)
         target_link_libraries(qrenderdoc PRIVATE Qt5::X11Extras)

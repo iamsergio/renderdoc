@@ -516,11 +516,13 @@ if(ENABLE_QRENDERDOC OR ENABLE_PYRENDERDOC)
         find_package(PythonLibs 3 REQUIRED)
     endif()
 
-    # we also need python3-config for swig, but it's only for the examples
-    # so it doesn't matter which one we find as long as we find something!
-    # Importantly it doesn't have to match the version we link against
-    if(NOT EXISTS "${PYTHON_EXECUTABLE}-config" AND NOT EXISTS "${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config")
-        message(FATAL_ERROR "We require ${PYTHON_EXECUTABLE}-config or ${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config to build swig, please install the python dev package for your system.")
+    if(ENABLE_PYRENDERDOC)
+        # we also need python3-config for swig, but it's only for the examples
+        # so it doesn't matter which one we find as long as we find something!
+        # Importantly it doesn't have to match the version we link against
+        if(NOT EXISTS "${PYTHON_EXECUTABLE}-config" AND NOT EXISTS "${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config")
+            message(FATAL_ERROR "We require ${PYTHON_EXECUTABLE}-config or ${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config to build swig, please install the python dev package for your system.")
+        endif()
     endif()
 
     add_subdirectory(qrenderdoc)

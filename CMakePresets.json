@@ -7,7 +7,9 @@
       "binaryDir": "${sourceDir}/build-${presetName}",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENABLE_TESTS": "OFF",
+        "ENABLE_PYRENDERDOC": "OFF"
       }
     },
     {
@@ -18,8 +20,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_FLAGS": "-DQT_FORCE_ASSERTS",
-        "USE_LINKER": "mold",
-        "ENABLE_TESTS": "ON"
+        "USE_LINKER": "mold"
       }
     },
     {
@@ -71,7 +72,7 @@
       "name": "release",
       "inherits": "base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     }
   ],
